@@ -1,0 +1,74 @@
+import pandas as pd
+import numpy as np
+
+# Load Declining Pool Data
+df_declining = pd.read_csv("declining_jobs_blsProj_hbsAutom..csv")
+df_growing_all = pd.read_csv("growing.lower_tier.csv")
+
+# Clean data formats
+for df in [df_declining, df_growing_all]:
+    df['Wage_Clean'] = pd.to_numeric(df['Annual_Median_wage_2025'].astype(str).str.replace(',', ''), errors='coerce')
+    df['Emp_Clean'] = pd.to_numeric(df['Employment_2025'].astype(str).str.replace(',', ''), errors='coerce')
+
+
+# Drop any row missing vital 2025 metric data
+df_declining = df_declining.dropna(subset=['Wage_Clean', 'Emp_Clean'])
+df_growing = df_growing_all.dropna(subset=['Wage_Clean', 'Emp_Clean'])
+
+# Compute baseline parameters for declining pool
+total_jobs_lost = df_declining['Emp_Clean'].sum()
+total_jobs_gained = df_growing['Emp_Clean'].sum()
+
+# Headcount-Weighted Wage Average = Sum(Wage * 2025_Employment) / Total_2025_Employment
+weighted_wage_declining = (df_declining['Wage_Clean'] * df_declining['Emp_Clean']).sum() / total_jobs_lost
+weighted_wage_low_tier =  (df_growing['Wage_Clean'] * df_growing['Emp_Clean']).sum() / total_jobs_gained
+
+
+# Calculate the wage deficit per job 
+wage_deficit_per_job =  weighted_wage_declining - weighted_wage_low_tier
+
+# Macro Transmission Weights
+mpc = 0.80
+multiplier = 1.35
+
+# 3x3 Simulation Grids
+displacement_risk = [0.10, 0.25, 0.50]       # Delta
+low_tier_reemployment = [0.20, 0.50, 0.80]   # p (probability of sliding into low-tier service)
+
+two_tier_results = []
+
+for delta in displacement_risk:
+    for p in low_tier_reemployment:
+        # Applying Equation: ΔY = L * delta * [ (1-p)*w_dec + p*(w_dec-w_low)]
+        unemployment_destruction_effect = (1 - p) * weighted_wage_declining
+        wage_compression_effect = p * (weighted_wage_declining - weighted_wage_low_tier)
+        
+        income_loss = total_jobs_lost * delta * (unemployment_destruction_effect + wage_compression_effect)
+        
+        # Transmission to aggregate consumption and demand
+        direct_consumption_drop = income_loss * mpc
+        total_macro_demand_impact = direct_consumption_drop * multiplier
+        
+        two_tier_results.append({
+            'Displacement Rate (Delta)': f"{delta*100}%",
+            'Low-Tier Reemployment Rate (p)': f"{p*100}%",
+            'Aggregate Income Loss ($B)': round(income_loss / 1e9, 3),
+            'Direct Consumption Shock ($B)': round(direct_consumption_drop / 1e9, 3),
+            'Total Demand Contraction ($B)': round(total_macro_demand_impact / 1e9, 3)
+        })
+
+df_simulation_matrix = pd.DataFrame(two_tier_results)
+
+
+print("\n======= MACROECONOMIC SHOCK SCENARIO MATRIX =======")
+print(df_simulation_matrix.to_string(index=False))
+
+
+
+#  4. PRINT Baseline parameters
+print("======= ADVANCED AI LABOUR MARKET CALIBRATION SUMMARY =======")
+print(f"Total Declining Base Pool (2025): {total_jobs_lost:,.0f} workers")
+print(f"Total Growing Base Pool (2025):   {total_jobs_gained:,.0f} workers")
+print(f"Weighted Baseline Declining Wage: ${weighted_wage_declining:,.2f}")
+print(f"Weighted Baseline Growing Wage:   ${weighted_wage_low_tier:,.2f}")
+print(f"Structural Wage Deficit Per Job:  ${wage_deficit_per_job:,.2f}")
