@@ -1,0 +1,33 @@
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+
+# Load Main Panel Dataset
+df_panel = pd.read_csv('Panel_Data2.csv')
+
+# --- DATA CLEANING PIPELINE ---
+# Remove percentage symbols and commas to convert strings to numbers
+df_panel['Emp_Change_Proj'] = pd.to_numeric(df_panel['Projected Employment change, percent, 2024–2034'].astype(str).str.replace('%', ''), errors='coerce')
+df_panel['Emp_Change_Hist'] = pd.to_numeric(df_panel['employment change 2021-2025 (%)'].astype(str).str.replace('%', ''), errors='coerce')
+df_panel['Wage_2025'] = pd.to_numeric(df_panel['Annual_Median_wage_2025'].astype(str).str.replace(',', ''), errors='coerce')
+df_panel['Emp_2021'] = pd.to_numeric(df_panel['Employment_2021'].astype(str).str.replace(',', ''), errors='coerce')
+df_panel['AIOE'] = pd.to_numeric(df_panel['AIOE'], errors='coerce')
+
+# Drop missing values to preserve econometric matrix alignment
+df_reg = df_panel.dropna(subset=['Emp_Change_Proj', 'AIOE', 'Wage_2025', 'Emp_2021', 'Emp_Change_Hist']).copy()
+
+# --- ECONOMETRIC SPECIFICATION ---
+# Dependent Variable (Y): Projected 10-Year Growth Rate
+y = df_reg['Emp_Change_Proj']
+
+# Independent Variables (X): Core Treatment + 3 Structural Controls
+X = df_reg[['AIOE', 'Wage_2025', 'Emp_2021', 'Emp_Change_Hist']]
+X = sm.add_constant(X)  # Generates our Intercept term (Beta_0)
+
+# Run OLS Regression
+controlled_model = sm.OLS(y, X).fit()
+
+print("==============================================================================")
+print("             MULTIVARIATE OLS REGRESSION SPECIFICATION RESULTS                ")
+print("==============================================================================")
+print(controlled_model.summary())
