@@ -1,0 +1,60 @@
+from pylab import *
+# import matplotlib.ticker as ticker
+import matplotlib as mpl
+# plt.scatter([0,1,2,3,4,5],[10001,10002,10003,10004,10005,10006])
+# gca().yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
+# show()
+
+x= data['AIOE']
+y= data['employment in 2025']
+plt.scatter(x,y)
+gca().yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
+title("AIOE Score vs Employment level in 2025")
+plt.xlabel("AIOE score")
+plt.ylabel("Employment by occupations")
+show()
+
+
+# sn.scatterplot(x,y)
+
+# x1 = np.array([0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8])
+# y1 = np.array([55, 60, 65, 62, 68, 70, 75, 78, 82, 85, 87])
+# plt.scatter(x1, y1)
+
+
+# 1. Load the dataset
+df = pd.read_csv('Panel_Data2.csv')
+
+# 2. Clean the Median Wage column (remove commas and convert to numbers)
+df['Wage_Clean'] = pd.to_numeric(df['Annual_Median_wage_2025'].astype(str).str.replace(',', ''), errors='coerce')
+
+# Drop rows with missing values in crucial columns
+df_plot1 = df.dropna(subset=['AIOE', 'Wage_Clean']).copy()
+
+# 3. Convert wage to thousands as requested (e.g., 30,000 -> 30)
+df_plot1['Wage_Thousands'] = df_plot1['Wage_Clean'] / 1000.0
+
+# 4. Group occupations into 20 equal-sized bins based on AIOE score
+df_plot1['AIOE_Bin'] = pd.qcut(df_plot1['AIOE'], q=20, labels=False, duplicates='drop')
+
+# Calculate the mean AIOE and mean Wage for each of the 20 bins
+bin_averages = df_plot1.groupby('AIOE_Bin').agg({'AIOE': 'mean', 'Wage_Thousands': 'mean'}).reset_index()
+
+# 5. Create the plot using subplots
+fig, ax = plt.subplots(figsize=(9, 5))
+
+# Plot all individual occupations as light grey background dots
+ax.scatter(df_plot1['AIOE'], df_plot1['Wage_Thousands'], alpha=0.2, color='gray', label='Individual Occupations')
+
+# Plot the 20 bin averages as bold blue dots
+ax.scatter(bin_averages['AIOE'], bin_averages['Wage_Thousands'], color='blue', s=65, zorder=3, label='Bin Averages (20 Bins)')
+
+# Formatting
+ax.set_xlabel('AI Occupational Exposure (AIOE) Score')
+ax.set_ylabel('Annual Median Wage 2025 ($ Thousands)')
+ax.set_title('AI Exposure vs. Annual Median Wage')
+ax.legend()
+ax.grid(True, linestyle='--', alpha=0.5)
+
+fig.tight_layout()
+fig.savefig('plot1_aioe_vs_wage.png')
